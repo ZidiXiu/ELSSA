@@ -172,64 +172,7 @@ def generate_data_semi_ohe(file_path, result_path, cut_bound, seed, z_dim, tail=
         return gx, df['e']
     else:
         return df, continuous_variables    
-    
-def generate_data(file_path, result_path, cut_bound, seed, n_samples = 50000, cox = True, return_gx=False):
 
-#     file_path = '/data/zidi/VI_EVT/data/'
-#     result_path_root = '/data/zidi/VI_EVT/results/'
-    ncov = 5
-    input_size = ncov
-    torch.manual_seed(127)
-    input_size = 5
-    z_dim=2
-    model = Net(output_size=input_size, h_dim=[32], z_dim=z_dim, loglogLink=True, positive=True)
-
-#     optimizer = optim.Adam(model.parameters(), lr=5e-4)
-    # data_name = 'fram_VIEVT_er05'
-
-    Path(result_path).mkdir(parents=True, exist_ok=True)
-
-    model_name = 'simulation'
-    model_path = result_path+"/"+model_name+".pt"
-    print(model)
-    torch.manual_seed(113)
-    mu = torch.zeros(z_dim)
-    logvar = torch.zeros(z_dim)
-    xi_ = torch.rand(z_dim)
-    sigma_ = torch.rand(z_dim)*2
-    print(xi_, sigma_)
-    # generate latent z
-    z = sample_mixedGPD(n_samples,  mu, logvar, xi_, sigma_, p_ = 0.99, eps=1e-4, seed = 123,device='cpu', lower_bound = -5.0, upper_bound = 20)
-    # generate x
-    torch.save(model.state_dict(), model_path)
-    
-    model.load_state_dict(torch.load(model_path))
-    model.eval()
-    torch.manual_seed(123)
-    x, xbeta=model(z, N=100, lower_bound = -5.0)
-    if cox:
-        df = simulation_cox_weibull(xbeta.detach().numpy().squeeze(), x.detach().numpy().squeeze(),  lambda_=0.001, nu_=5,cut_bound=cut_bound, seed=seed)
-    else:
-        df = simulation_simple(xbeta.detach().numpy().squeeze(), x.detach().numpy().squeeze(),cut_bound=cut_bound, seed=seed)
-    
-#     df = simulation_simple(xbeta.detach().numpy().squeeze(), x_pool, cut_bound, seed=seed)
-#     df['e'].mean()
-#     np.random.seed(seed)
-#     perm_idx = np.random.permutation(n_samples)
-#     train_idx = perm_idx[0:int(n_samples/2)]
-#     valid_idx = perm_idx[int(n_samples/2):int(5*n_samples/6)]
-#     test_idx = perm_idx[int(5*n_samples/6):n_samples]
-    
-#     train = formatted_data_simu(df['x'], df['t'], df['e'], z.detach().numpy(), train_idx)
-#     test = formatted_data_simu(df['x'], df['t'], df['e'], z.detach().numpy(), test_idx)
-#     valid = formatted_data_simu(df['x'], df['t'], df['e'], z.detach().numpy(), valid_idx)
-    
-    continuous_variables = np.arange(ncov)
-    df['z'] = z
-    if return_gx:
-        return xbeta.detach().numpy().squeeze(), df['e']
-    else:
-        return df, continuous_variables
 
 def simulation_cox_weibull(z, X, lambda_=0.5, nu_=1/100,cut_bound=1, seed=123):
     # linear relationship
