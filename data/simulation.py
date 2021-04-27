@@ -96,8 +96,9 @@ def simulation_cox_weibull_all(n=10000, p=3, pc=1, pval=[1/4.]*4, lambda_=7e-8, 
         Y = T.copy()
         C = 0
         event = np.ones(n)
+        
 #     print(beta_linear)
-    return({"t": Y, "e":event, "x":X, "T": T,"C":C, 'cts_idx':np.arange(X_cts.shape[1]), 'ohe':[cat0.shape[1], cat1.shape[1]]})
+    return({"t": Y, "e":event, "x":np.concatenate((X_age, X_randon, X_cat), axis=1), "T": T,"C":C, 'cts_idx':np.arange(2), 'ohe':[cat0.shape[1], cat1.shape[1]]})
 
 
 def formatted_data_simu(x, t, e, idx):
