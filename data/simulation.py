@@ -38,26 +38,32 @@ def simulation_cox_weibull_all(n=10000, p=3, pc=1, pval=[1/4.]*4, lambda_=7e-8, 
     
     np.random.seed(seed)
     # generate based on Bender's paper
-    beta_cts = np.array([0.15,0.001, 0.10])
+    beta_cts = np.array([0.15,0.001, 0.05])
     X_age = np.random.normal(loc=24.3, scale = 8.38, size=n).reshape((n,1))
     X_randon = np.random.normal(loc=266.84, scale = 507.82, size=n).reshape((n,1))
     # add an interaction term
-    X_int = (X_age * X_randon/3000).reshape((n,1))
+    X_int = (X_age * X_randon/500).reshape((n,1))
     
     X_cts = np.concatenate((X_age, X_randon, X_int), axis=1)
+    X_cts_out = np.concatenate((X_age, X_randon), axis=1)
     
+    # Categorical variables
     pc_level = len(pval)
-#     p_total = (p-pc) + pc*pc_level
-#     cat0 = np.vstack([np.random.multinomial(1, [1/4.]*4, size=n) for i in range(4)])
-#     cat1 = np.stack([np.random.multinomial(1, [1/100.]*100, size=n) for i in range(100)], axis=0).reshape(n, 100)
-    cat0 = np.random.multinomial(1, [1/4.]*4, size=n)
-    cat1 = np.random.multinomial(1, [1/100.]*100, size=n)
+    p0_all_raw = np.random.sample(5)
+    p0_all = p0_all_raw/p0_all_raw.sum()
+    
+    cat0 = np.random.multinomial(1, p0_all, size=n)
+    p1_all_raw = np.random.sample(50)
+    p1_all = p1_all_raw/p1_all_raw.sum()
+       
+    cat1 = np.random.multinomial(1, p1_all, size=n)
     X_cat = np.concatenate((cat0, cat1), axis=1)
     num_cat_coef = X_cat.shape[1]
     beta_cat0 = np.random.uniform(0,5,cat0.shape[1])
     beta_cat1 = np.random.uniform(-0.5,0.5,cat1.shape[1])
         
     X = np.concatenate((X_cts, X_cat), axis=1)
+    X_out = np.concatenate((X_cts_out, X_cat), axis=1)
 
     
     beta_linear = np.concatenate((beta_cts, beta_cat0, beta_cat1))
@@ -65,11 +71,12 @@ def simulation_cox_weibull_all(n=10000, p=3, pc=1, pval=[1/4.]*4, lambda_=7e-8, 
     U = np.random.uniform(size=n)
     # generate T accordingly
     T = (1/alpha_)*np.log(1-alpha_*np.log(U)/(lambda_*np.exp(np.dot(X,beta_linear))))
+    del X
 #     event = T<cut_bound
     if censor_bound>0:
         sidx = np.argsort(T,axis=0)
         TS = T[sidx]
-        XS = X[sidx,:]
+        XS = X_out[sidx,:]
         np.random.seed(seed)
         # change the way censoring is defined
         # first set the maximum censoring at: censor_bound
@@ -98,8 +105,28 @@ def simulation_cox_weibull_all(n=10000, p=3, pc=1, pval=[1/4.]*4, lambda_=7e-8, 
         event = np.ones(n)
         
 #     print(beta_linear)
-    return({"t": Y, "e":event, "x":np.concatenate((X_age, X_randon, X_cat), axis=1), "T": T,"C":C, 'cts_idx':np.arange(2), 'ohe':[cat0.shape[1], cat1.shape[1]]})
+    return({"t": Y, "e":event, "x":X, "T": T,"C":C, 'cts_idx':np.arange(2), 'ohe':[cat0.shape[1], cat1.shape[1]],'coef': beta_linear})
 
+def single_subj_true_dist_cox_gompertz(covariates, beta_linear, n=1000, seed=123,tt=np.linspace(0,1,100), lambda_=7e-8, alpha_=0.2138):
+    X_age = covariates[0]
+    X_randon = covariates[1]
+    X_int = (X_age * X_randon/500)
+    X_cts = [X_age, X_randon, X_int]
+    
+    Xbeta = (X_cts * beta_linear[:3]).sum()
+    beta_cat1 = beta_linear[int(3+covariates[2])]
+    beta_cat2 = beta_linear[int(7+covariates[3])]
+    Xbeta += beta_cat1+beta_cat2
+    print(Xbeta)
+    
+    U = np.random.uniform(size=n)
+    # generate T accordingly
+    T = (1/alpha_)*np.log(1-alpha_*np.log(U)/(lambda_*np.exp(Xbeta)))
+    # generate labels (censoring or event)
+    np.random.seed(seed)
+    T_dist = 1-np.exp((lambda_/alpha_)*(1-np.exp(alpha_*tt)))
+    
+    return({"T": T, 'T_dist':T_dist})
 
 def formatted_data_simu(x, t, e, idx):
     death_time = np.array(t[idx], dtype=float)

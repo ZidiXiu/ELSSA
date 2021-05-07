@@ -1,4 +1,7 @@
 import numpy as np
+from torch.utils.data import Dataset, DataLoader, Sampler
+import torch
+
 
 # for training/testing/validation split
 def formatted_data(x, t, e, idx):
@@ -9,3 +12,62 @@ def formatted_data(x, t, e, idx):
     print("observed fold:{}".format(sum(e[idx]) / len(e[idx])))
     survival_data = {'x': covariates, 't': death_time, 'e': censoring}
     return survival_data
+
+
+class SimpleDataset(Dataset):
+    def __init__(self, x, y, e, transform=False, mean=0, std = 1):
+        self.data = x
+        self.targets = y
+        self.label = e
+        self.transform = transform
+        
+        if self.transform:
+            self.mean, self.std = mean, std
+            
+    def __getitem__(self, index):
+        img = self.data[index]
+        target = self.targets[index]
+        label = self.label[index]
+        
+        if self.transform:
+            return (img-self.mean)/self.std, target, label
+        else:
+            return img, target, label
+        
+        
+    def __len__(self):
+        return len(self.data)
+    
+    
+
+# class SimpleDataset_trans(Dataset):
+#     def __init__(self, x, y, e, transform=False, covlist = None, mean=0, std = 1):
+#         self.data = x
+#         self.targets = y
+#         self.label = e
+#         self.transform = transform
+#         self.covlist = covlist
+#         if not self.covlist:
+#             self.covlist = np.arange(self.data.shape[1])
+        
+#         if self.transform:
+#             self.mean, self.std = mean, std
+            
+#     def __getitem__(self, index):
+#         img = self.data[index]
+#         target = self.targets[index]
+#         label = self.label[index]
+        
+#         if self.transform:
+#             return (img[self.covlist]-self.mean)/self.std, target, label
+#         else:
+#             return img, target, label
+        
+        
+
+#     def __len__(self):
+#         return len(self.data)        
+        
+
+#     def __len__(self):
+#         return len(self.data)
