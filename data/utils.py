@@ -1,6 +1,7 @@
 import numpy as np
 from torch.utils.data import Dataset, DataLoader, Sampler
 import torch
+import pandas
 
 
 # for training/testing/validation split
@@ -71,3 +72,13 @@ class SimpleDataset(Dataset):
 
 #     def __len__(self):
 #         return len(self.data)
+
+
+### Cleaning up
+# one-hot-encoding all categorical variables
+def one_hot_encoder(data, encode):
+    data_encoded = data.copy()
+    encoded = pandas.get_dummies(data_encoded, prefix=encode, columns=encode)
+#    print("head of data:{}, data shape:{}".format(data_encoded.head(), data_encoded.shape))
+#    print("Encoded:{}, one_hot:{}{}".format(encode, encoded.shape, encoded[0:5]))
+    return encoded

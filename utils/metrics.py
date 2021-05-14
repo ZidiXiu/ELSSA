@@ -17,16 +17,18 @@ from utils.trainer_helpers import *
 
 
 # calculate negative likelihood 
-def NLL_reg(p_raw, y, e, tt):
+def NLL_reg(p_raw, y, e, tt, collapsed=True):
     # using likelihood to regularize the performance
     y_cat = batch_t_categorize(y, e, tt)
     #         keep_idx = torch.where(y <= t_max)[0]
-
-    y_loglikeli = -((p_raw*torch.tensor(y_cat)).sum(axis=1)+1e-6).log().sum()
+    
+    if collapsed:
+        y_loglikeli = -((p_raw*torch.tensor(y_cat)).sum(axis=1)+1e-6).log().sum()
+    else:
+        y_loglikeli = -((p_raw*torch.tensor(y_cat)).sum(axis=1)+1e-6).log()
     #  -((p_raw*torch.tensor(y_cat)).sum(axis=1)+1e-4).log().mean()
     
     return y_loglikeli
-
 
 
 def get_CI_raw(event, true_t, pred_t):
@@ -49,3 +51,27 @@ def point_loss(t_hat, y, e, loss_type='MSE'):
         closs = ((1-e)*torch.abs(hinge_loss.squeeze())/t_hat.squeeze()).sum()
         
     return eloss, closs
+
+'''time dependent Concordance Index'''
+
+def I_Ctd_DLN(t, e, test_pred_prob, tt, i,j):
+#     x_i = x[i]
+#     x_j = x[j]
+    t_true_i = t[i]
+    t_i_idx = torch.where(batch_t_categorize(t[i].reshape([1,1]), e[i].reshape([1,1]), tt)[-1]==1)[0]
+    sum_idx = torch.cat([torch.ones(t_i_idx), torch.zeros(len(tt)-t_i_idx)])
+#     print(test_pred_prob[i], sum_idx)
+    F_i = torch.dot(test_pred_prob[i].squeeze(), sum_idx)
+    F_j = torch.dot(test_pred_prob[j].squeeze(), sum_idx)
+    return(1*(F_i > F_j).cpu().detach().item())
+    # return (log_S_i, log_S_j)
+
+def pair_Ctd_DLN(t, e, test_pred_prob, tt):
+    j_pool = []
+    while len(j_pool)==0:
+        subj_i = np.random.choice(torch.where(e==1)[0],1)
+        j_pool = torch.where(t>t[subj_i])[0]
+        
+    subj_j = np.random.choice(torch.where(t>t[subj_i])[0],1)
+        
+    return(I_Ctd_DLN(t, e, test_pred_prob, tt, subj_i,subj_j))
