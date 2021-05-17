@@ -18,23 +18,25 @@ def formatted_data_missing(x, t, e, missing, sub_idx):
     return survival_data
 
 
-def generate_data(file_path='/data/zidi/cVAE/datasets/'):
+def generate_data(file_path='/data/zidi/cVAE/datasets/', m=16):
     # this program is to extract the preset training/testing/validating dataset
     np.random.seed(31415)
     dir_path = os.path.dirname(file_path)
     
 
-    path = os.path.abspath(os.path.join(dir_path, '', 'flchain.csv'))
+    path = os.path.abspath(os.path.join(file_path, '', 'support2.txt'))
     data_frame = pandas.read_csv(path, index_col=0)
     # remove rows with 0 time-to-event
-    data_frame = data_frame[data_frame.futime != 0]
-    data_frame['pat'] = np.arange(data_frame.shape[0])
     # x_data = data_frame[['age', 'sex', 'kappa', 'lambda', 'flc.grp', 'creatinine', 'mgus']]
     # Preprocess
-    to_drop = ['futime', 'death', 'chapter', 'pat']
+    to_drop = ['hospdead', 'death', 'prg2m', 'prg6m', 'dnr', 'dnrday', 'd.time', 'aps', 'sps', 'surv2m', 'surv6m',
+                   'totmcst']
     dataset = data_frame.drop(labels=to_drop, axis=1)
 
-    cat_var = ['sex', 'flc.grp', 'sample.yr', 'mgus']
+
+    cat_var = ['sex', 'dzgroup', 'dzclass', 'income', 'race', 'ca', 'sfdm2']
+    cat_idx = np.where(np.isin(dataset.columns.values, np.array(cat_var)))
+
     cat_type = dict(zip(cat_var, ['category']*len(cat_var)))
     cat_idx = np.where(np.isin(dataset.columns.values, np.array(cat_var)))[0]
     cts_var = np.setdiff1d(dataset.columns, cat_var)
@@ -58,10 +60,8 @@ def generate_data(file_path='/data/zidi/cVAE/datasets/'):
     valid_idx = idx[num_examples + split:  dataset.shape[0]]
 
     ####
-    t_data = data_frame[['futime']]
+    t_data = data_frame[['d.time']]
     e_data = data_frame[['death']]
-    pat_data = data_frame[['pat']]
-
     # positions where are missing indicated by 0
     missing_mask = 1-1*pandas.isna(dataset)
 #     missing_mask.head()
@@ -106,7 +106,7 @@ def generate_data(file_path='/data/zidi/cVAE/datasets/'):
     valid = formatted_data_missing(x=x, t=t, e=e, missing=missing, sub_idx=valid_idx)
 
     covariates = np.array([name.replace('.','_') for name in covariates])
-    variable_info = {'cov_list':covariates, 'cts_var':covariates[cts_idx], 'cts_idx':cts_idx, 'cat_var':covariates[cat_idx], 'cat_idx':cat_idx }
+    variable_info = {'cov_list':covariates, 'cts_var':covariates[cts_idx], 'cts_idx':cts_idx, 'cat_var':covariates[cat_idx], 'cat_idx':cat_idx, 'x_landmarks':None, 'x_levels':None}
 
     return train, valid, test, variable_info
 
