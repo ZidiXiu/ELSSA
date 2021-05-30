@@ -31,8 +31,12 @@ def NLL_reg(p_raw, y, e, tt, collapsed=True):
     return y_loglikeli
 
 
-def get_CI_raw(event, true_t, pred_t):
-    return concordance_index_censored((event.squeeze().cpu().detach().numpy()).astype(bool), true_t.squeeze().cpu().detach().numpy(), -pred_t.squeeze().cpu().detach().numpy())
+def get_CI_raw(event, true_t, pred_t, torch_object=False):
+    if torch_object:
+        return concordance_index_censored((event.squeeze().cpu().detach().numpy()).astype(bool), true_t.squeeze().cpu().detach().numpy(), -pred_t.squeeze().cpu().detach().numpy())
+    
+    else:
+        return concordance_index_censored(event.astype(bool), true_t, -pred_t)
 
 # calculate point estimation loss
 def point_loss(t_hat, y, e, loss_type='MSE'):

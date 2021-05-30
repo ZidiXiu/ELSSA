@@ -82,3 +82,8 @@ def wt_avg(p_raw, tt):
     # calculate the averaged sum of these bins as a summary
     t_wa_hat = (p_raw*tt).sum(1)
     return t_wa_hat
+
+
+def attention_mask(mask_new, ncov, p=0.1):
+    mask_attn = (torch.ones(len(mask_new), ncov, ncov).to('cpu')-torch.diag(torch.ones(ncov)).unsqueeze(0).repeat(len(mask_new),1,1).to('cpu')+torch.vstack([torch.diag(mask_new[idx]).unsqueeze(0) for idx in range(len(mask_new))]))*(torch.rand(len(mask_new), ncov, ncov) > p).to('cpu')
+    return mask_attn

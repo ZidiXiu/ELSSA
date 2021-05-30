@@ -38,6 +38,32 @@ class SimpleDataset(Dataset):
         
     def __len__(self):
         return len(self.data)
+
+class SimpleDataset_masked(Dataset):
+    def __init__(self, x, y, e, mask, transform=False, mean=0, std = 1):
+        self.data = x
+        self.targets = y
+        self.label = e
+        self.mask = mask
+        self.transform = transform
+        
+        if self.transform:
+            self.mean, self.std = mean, std
+            
+    def __getitem__(self, index):
+        img = self.data[index]
+        target = self.targets[index]
+        label = self.label[index]
+        mask = self.mask[index]
+        
+        if self.transform:
+            return (img-self.mean)/self.std, target, label
+        else:
+            return img, target, label, mask
+        
+        
+    def __len__(self):
+        return len(self.data)
     
     
 
