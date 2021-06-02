@@ -49,7 +49,7 @@ class Attention(nn.Module):
         super(Attention, self).__init__()
         self.flatten = nn.Flatten()
         self.dropout = nn.Dropout(p=dropout)
-    def forward(self, query, key, value, mask=None):
+    def forward(self, query, key, value, mask=None, flatten=True):
 
         # scores = torch.matmul(query, key.transpose(-2, -1)) \
         #          / math.sqrt(query.size(-1))
@@ -75,8 +75,48 @@ class Attention(nn.Module):
         p_attn = self.dropout(p_attn)
         output = torch.matmul(p_attn, value)
         
-        return self.flatten(output), p_attn
-    
+        if flatten:
+            return self.flatten(output), p_attn
+        else:
+            return output, p_attn
+
+class SelfAttention(nn.Module):
+    """
+    Compute 'Scaled Dot Product Attention
+    """
+    def __init__(self, dropout=0.1):
+        super(SelfAttention, self).__init__()
+        self.flatten = nn.Flatten()
+        self.dropout = nn.Dropout(p=dropout)
+    def forward(self, x, mask=None, flatten=True):
+
+        # scores = torch.matmul(query, key.transpose(-2, -1)) \
+        #          / math.sqrt(query.size(-1))
+        
+        # f(query, key)
+        # query: d \times m
+        # (d x m ) x (m x d)
+        # d \times d
+        device = x.device
+        scores = torch.exp(torch.matmul(x, x.transpose(-2, -1))) \
+                 / math.sqrt(x.size(-1))
+
+        if mask is not None:
+            # mask missing points before softmax
+            scores = scores.masked_fill(mask.to(device) == 0, -1e9)
+            del mask
+
+        p_attn = F.softmax(scores, dim=-1)
+        del scores
+
+#         if dropout is not None:
+        p_attn = self.dropout(p_attn)
+        output = torch.matmul(p_attn, x)
+        
+        if flatten:
+            return self.flatten(output), p_attn
+        else:
+            return output, p_attn    
     
 class MultiHeadedAttention(nn.Module):
     """
