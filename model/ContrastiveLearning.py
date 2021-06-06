@@ -8,7 +8,7 @@ from torch import nn, optim
 import numpy as np
 
 class FDV_CL(nn.Module):
-    def __init__(self, m, ncov, input_size=None, h_dim=[512,512], t_landmarks = None, train_time = None, percentile=False, tau = 1.0):
+    def __init__(self, m, ncov, h_dim=0, t_landmarks = None, train_time = None, percentile=False, tau = 1.0):
         super(FDV_CL, self).__init__()
         # learnable temperature
         self.log_tau = torch.nn.Parameter(torch.Tensor([np.log(tau)]))
@@ -17,11 +17,11 @@ class FDV_CL(nn.Module):
         self.ncov = ncov
         self.time_landmark, self.time_emb_landmark = self.time_emb_init(t_landmarks, train_time, percentile)
         
-        if input_size == None:
+        if h_dim[0] == 0:
             self.enc = nn.Identity()
         else:
             net = []
-            hs = [input_size] + h_dim + [input_size]
+            hs = [m] + h_dim + [m]
             for h0, h1 in zip(hs, hs[1:]):
                 net.extend([
                     nn.Linear(h0, h1),
@@ -38,20 +38,20 @@ class FDV_CL(nn.Module):
                 
         batch_dim = z.size(0)
         # by dimension encoding
-        # [batch_size, ncov*n_emb]
+        # [batch_size, n_emb]
         hz = (self.norm(self.enc(z)))/tau
            
         # [batch_size, n_emb]
-        hy = (self.linear_interpolation_time(t, e))/tau
+        hy = self.norm((self.linear_interpolation_time(t, e)))/tau
                 
-        hy_new = torch.repeat_interleave(self.linear_interpolation_time(t, e)/tau, torch.tensor(batch_dim*[self.ncov]).to(device), dim=0).view(-1,hz.size()[-1])
+#         hy_new = torch.repeat_interleave(self.linear_interpolation_time(t, e)/tau, torch.tensor(batch_dim*[self.ncov]).to(device), dim=0).view(-1,hz.size()[-1])
                 
-        del z, t, e, hy
+        del z, t, e
         
         # [batch_size, batch_size]
-        similarity_matrix = hz @ hy_new.t()
+        similarity_matrix = hz @ hy.t()
                 
-        del hz, hy_new
+        del hz, hy
         pos_mask = torch.eye(batch_dim,dtype=torch.bool)
         
         g = similarity_matrix[pos_mask].view(batch_dim,-1)
@@ -72,7 +72,7 @@ class FDV_CL(nn.Module):
         del dummy_ce
         output = torch.clamp(output,-5,15)
         
-        return output.mean()
+        return output
     
     
     def linear_interpolation_time(self, batch_t, batch_e):

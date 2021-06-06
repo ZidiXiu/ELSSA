@@ -11,7 +11,7 @@ def missing_proportion(dataset):
 
 
 # TODO Fix merge on ID
-def generate_data(m=16):
+def generate_data(data_path = '', m=16):
     # 'PUBCSNUM' 'REG' 'MAR_STAT' 'RACE1V' 'NHIADE' 'SEX' 'AGE_DX' 'YR_BRTH' 'SEQ_NUM' 'MDXRECMP'
     #  'YEAR_DX' 'PRIMSITE' 'LATERAL' 'HISTO2V' 'BEHO2V' 'HISTO3V' 'BEHO3V' 'GRADE' 'DX_CONF'
     # 'REPT_SRC' 'EOD10_SZ' 'EOD10_EX' 'EOD10_PE' 'EOD10_ND' 'EOD10_PN' 'EOD10_NE' 'EOD13' 'EOD2'
@@ -83,7 +83,6 @@ def generate_data(m=16):
     # TODO cause specific: VSRTSADX: alive or dead other cause =0, ODTHCLASS: alived or dead of cancer=0
     #  TODO: TYPE_FU may be include Sanfranciso
     np.random.seed(31415)
-    data_path = '/data/zidi/cVAE/datasets/'
     print("data_path:{}".format(data_path))
     data_frame = pandas.read_csv(data_path + 'seers_data.csv', index_col=0)
     print("all_data:{}".format(data_frame.shape))

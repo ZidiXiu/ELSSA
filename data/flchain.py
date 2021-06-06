@@ -106,7 +106,7 @@ def generate_data(file_path='/data/zidi/cVAE/datasets/'):
     valid = formatted_data_missing(x=x, t=t, e=e, missing=missing, sub_idx=valid_idx)
 
     covariates = np.array([name.replace('.','_') for name in covariates])
-    variable_info = {'cov_list':covariates, 'cts_var':covariates[cts_idx], 'cts_idx':cts_idx, 'cat_var':covariates[cat_idx], 'cat_idx':cat_idx }
+    variable_info = {'cov_list':covariates, 'cts_var':covariates[cts_idx], 'cts_idx':cts_idx, 'cat_var':covariates[cat_idx], 'cat_idx':cat_idx, 'x_landmarks':None, 'x_levels':None}
 
     return train, valid, test, variable_info
 

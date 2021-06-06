@@ -62,7 +62,7 @@ def batch_t_categorize(batch_t, batch_e, tt):
 
 # get summary statistics of the predicted distribution
 def calculate_quantiles(post_prob, tt, percentiles):
-    post_prob_sums = torch.cumsum(post_prob,axis=1)
+    post_prob_sum = torch.cumsum(post_prob,axis=1)
     try:
         tt_p = [tt[torch.argmin(torch.abs(post_prob_sum-p))] for p in percentiles]
     except TypeError:

@@ -76,7 +76,8 @@ class Attention(nn.Module):
         output = torch.matmul(p_attn, value)
         
         if flatten:
-            return self.flatten(output), p_attn
+#             return self.flatten(output), p_attn
+            return output.sum(1), p_attn
         else:
             return output, p_attn
 
@@ -114,7 +115,8 @@ class SelfAttention(nn.Module):
         output = torch.matmul(p_attn, x)
         
         if flatten:
-            return self.flatten(output), p_attn
+#             return self.flatten(output), p_attn
+            return output.sum(1), p_attn
         else:
             return output, p_attn    
     
