@@ -52,14 +52,41 @@ def t_categorize(t_, e_, tt):
     else:
         t_cat = t_label_censor(t_, tt)
     return t_cat
-    
+
+# # previous version, rounded to the nearist bin
 def batch_t_categorize(batch_t, batch_e, tt):
     nbin = len(tt)
     nbatch = batch_t.shape[0]
     all_cat = [t_categorize(batch_t[obs], batch_e[obs], tt) for obs in np.arange(nbatch)]  
     return torch.vstack(all_cat)
 
+def time_embedding(batch_t, batch_e, tt):
 
+    # written for torch
+    # returns index
+    # a[i-1] < v <= a[i]
+    nbin = len(tt)
+    time_emb_landmark = torch.eye(nbin).to(batch_t.device)
+    indx = torch.searchsorted(tt, batch_t)
+    # combine the first two indices, and the last two indices
+    # to include the unobserved minimum and maximum value
+    # combines [0,1], and [m-1, m]
+    indx = torch.where(indx==0, 1, indx)
+    indx = torch.where(indx==nbin, nbin-1, indx)
+    # for event
+    coef = (time_emb_landmark[indx] - time_emb_landmark[indx-1])/(tt[indx].to(batch_t.device) - tt[indx-1].to(batch_t.device)).view(len(indx),1)
+#         print(coef.size())
+    out = time_emb_landmark[indx-1] + coef*(batch_t-tt[indx-1].to(batch_t.device)).view(len(indx),1)    # linear interpolation
+
+    # for censoring
+    censor_mask = torch.vstack([(torch.cat((out[i,:idx+1].squeeze(), torch.ones(nbin-idx-1).to(batch_t.device))).view(1, nbin)) for i, idx in enumerate(indx)]).float()
+    out_censor = torch.matmul(censor_mask, time_emb_landmark.T)
+
+    del censor_mask, coef
+
+    return (out*batch_e.view(len(out),1) + out_censor*(1-batch_e).view(len(out),1)).float()
+
+        
 # get summary statistics of the predicted distribution
 def calculate_quantiles(post_prob, tt, percentiles):
     post_prob_sum = torch.cumsum(post_prob,axis=1)

@@ -17,9 +17,36 @@ from utils.trainer_helpers import *
 
 
 # calculate negative likelihood 
+# def NLL_reg(p_raw, y, e, tt, collapsed=True):
+#     # using likelihood to regularize the performance
+#     y_cat = batch_t_categorize(y, e, tt)
+#     #         keep_idx = torch.where(y <= t_max)[0]
+    
+#     if collapsed:
+#         y_loglikeli = -((p_raw*torch.tensor(y_cat)).sum(axis=1)+1e-6).log().sum()
+#     else:
+#         y_loglikeli = -((p_raw*torch.tensor(y_cat)).sum(axis=1)+1e-6).log()
+#     #  -((p_raw*torch.tensor(y_cat)).sum(axis=1)+1e-4).log().mean()
+    
+#     return y_loglikeli
+
 def NLL_reg(p_raw, y, e, tt, collapsed=True):
     # using likelihood to regularize the performance
-    y_cat = batch_t_categorize(y, e, tt)
+    y_cat = time_embedding(y, e, tt)
+    #         keep_idx = torch.where(y <= t_max)[0]
+    
+    if collapsed:
+        y_loglikeli = -((p_raw*torch.tensor(y_cat)).sum(axis=1)+1e-6).log().sum()
+    else:
+        y_loglikeli = -((p_raw*torch.tensor(y_cat)).sum(axis=1)+1e-6).log()
+    #  -((p_raw*torch.tensor(y_cat)).sum(axis=1)+1e-4).log().mean()
+    
+    return y_loglikeli
+
+
+def NLL_reg_emb(p_raw, y, e, tt, collapsed=True):
+    # using likelihood to regularize the performance
+    y_cat = time_embedding(y, e, tt)
     #         keep_idx = torch.where(y <= t_max)[0]
     
     if collapsed:

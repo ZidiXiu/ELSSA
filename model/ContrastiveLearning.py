@@ -8,14 +8,14 @@ from torch import nn, optim
 import numpy as np
 
 class FDV_CL(nn.Module):
-    def __init__(self, m, ncov, h_dim=0, t_landmarks = None, train_time = None, percentile=False, tau = 1.0):
+    def __init__(self, m, ncov, h_dim=[0], t_landmarks = None, train_time = None, percentile=False, tau = 1.0, trainable=True):
         super(FDV_CL, self).__init__()
         # learnable temperature
         self.log_tau = torch.nn.Parameter(torch.Tensor([np.log(tau)]))
         self.criterion = torch.nn.CrossEntropyLoss(reduction='none')
         self.m = m
         self.ncov = ncov
-        self.time_landmark, self.time_emb_landmark = self.time_emb_init(t_landmarks, train_time, percentile)
+        self.time_landmark, self.time_emb_landmark = self.time_emb_init(t_landmarks, train_time, percentile, trainable)
         
         if h_dim[0] == 0:
             self.enc = nn.Identity()
@@ -79,6 +79,7 @@ class FDV_CL(nn.Module):
         '''
         Time embedding based on event type
         '''
+        self.time_emb_landmark = self.time_emb_landmark.to(batch_t.device)
         # written for torch
         # returns index
         # a[i-1] < v <= a[i]
@@ -98,14 +99,19 @@ class FDV_CL(nn.Module):
         out = self.time_emb_landmark[indx-1] + coef*(batch_t-self.time_landmark[indx-1].to(batch_t.device)).view(len(indx),1)    # linear interpolation
 
         # for censoring
-        censor_mask = torch.vstack([(torch.cat((torch.zeros(idx), torch.ones(self.m-idx))).view(1, self.m))/(self.m-idx) for idx in indx.to('cpu')])
-        out_censor = torch.matmul(censor_mask.to(batch_t.device), self.time_emb_landmark.T)
+        censor_mask = torch.vstack([(torch.cat((out[i,:idx+1].squeeze().detach(), torch.ones(self.m-idx-1).to(batch_t.device))).view(1, self.m))/(self.m-idx) for i, idx in enumerate(indx)]).float()
+        
+#         # OR no normalization?
+#         censor_mask = torch.vstack([(torch.cat((out[i,:idx+1].squeeze().detach(), torch.ones(self.m-idx-1).to(batch_t.device))).view(1, self.m)) for i, idx in enumerate(indx)]).float()
+        
+        out_censor = torch.matmul(censor_mask, self.time_emb_landmark.T)
         
         del censor_mask, coef
-
         return (out*batch_e.view(len(out),1) + out_censor*(1-batch_e).view(len(out),1)).float()
+
+#         return (out*batch_e.view(len(out),1) + out_censor*(1-batch_e).view(len(out),1)).float()
     
-    def time_emb_init(self, t_landmarks, train_time, percentile = True):
+    def time_emb_init(self, t_landmarks, train_time, percentile = True, trainable = True):
         '''
         embedding of time-to-event distribution 
 
@@ -122,8 +128,10 @@ class FDV_CL(nn.Module):
         # save the initialized landmarks as a torch parameter dictionary
 
         t_emb_landmarks = torch.eye(self.m)
-
-        return t_landmarks, torch.nn.Parameter(t_emb_landmarks)    
+        if trainable:
+            return t_landmarks, torch.nn.Parameter(t_emb_landmarks)
+        else:
+            return t_landmarks, t_emb_landmarks
     
     def norm(self,z):
         return torch.nn.functional.normalize(z,dim=-1)
