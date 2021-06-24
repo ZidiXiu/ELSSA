@@ -4,6 +4,7 @@ import torch
 
 import math
 import numpy as np
+from utils.trainer_helpers import attention_mask
 
 class Linear(nn.Module):
     '''
@@ -81,15 +82,18 @@ class Attention(nn.Module):
         else:
             return output, p_attn
 
+        
+        
 class SelfAttention(nn.Module):
     """
     Compute 'Scaled Dot Product Attention
     """
-    def __init__(self, dropout=0.1):
+    def __init__(self, dropout=0.1, alpha = 0.9):
         super(SelfAttention, self).__init__()
         self.flatten = nn.Flatten()
         self.dropout = nn.Dropout(p=dropout)
-    def forward(self, x, mask=None, flatten=True):
+        self.alpha = alpha
+    def forward(self, x, mask=None, flatten=True, aggregate=False, recompute=True):
 
         # scores = torch.matmul(query, key.transpose(-2, -1)) \
         #          / math.sqrt(query.size(-1))
@@ -99,27 +103,245 @@ class SelfAttention(nn.Module):
         # (d x m ) x (m x d)
         # d \times d
         device = x.device
-        scores = torch.exp(torch.matmul(x, x.transpose(-2, -1))) \
-                 / math.sqrt(x.size(-1))
-
-        if mask is not None:
+        if not aggregate:
+            recompute = True
+        if recompute:
+            # recalculate attention score
+            scores = torch.exp(torch.matmul(x, x.transpose(-2, -1))) \
+                     / math.sqrt(x.size(-1))
             # mask missing points before softmax
-            scores = scores.masked_fill(mask.to(device) == 0, -1e9)
+            if type(mask) != type(None):
+                mask_attn = attention_mask(mask.to(device), x.size(1))
+            if aggregate:
+                # Assume that the covariates dependencies are transferrable 
+                p_attn = self.calculate_running_score(scores, mask_attn)
+            else:
+                if type(mask) != type(None):
+                    scores = scores.masked_fill(mask_attn.to(device) == 0, 0)
+                p_attn = F.softmax(scores, dim=-1)
+                
+            del scores, mask_attn
+
+    #         if dropout is not None:
+            p_attn = self.dropout(p_attn)
+        
+        else:
+            # using stored scores
+            scores = self.running_score.detach()
+            p_attn = F.softmax(scores, dim=-1)
+            p_attn = self.dropout(p_attn)
+            
+        if mask is not None:
+#             print(p_attn.size(), x.size(), mask.size())
+            output = torch.matmul(p_attn, x*mask.unsqueeze(-1).to(device))
             del mask
-
-        p_attn = F.softmax(scores, dim=-1)
-        del scores
-
-#         if dropout is not None:
-        p_attn = self.dropout(p_attn)
-        output = torch.matmul(p_attn, x)
+        else:
+            output = torch.matmul(p_attn, x)
         
         if flatten:
 #             return self.flatten(output), p_attn
-            return output.sum(1), p_attn
+#             print(scores.size())
+            return output.sum(1), p_attn.detach()
         else:
-            return output, p_attn    
+            return output, p_attn.detach()
+        
+    def calculate_running_score(self, scores, mask_attn=None):
+#         print(scores.size())
+        if type(mask_attn) != type(None):
+            scores = scores.masked_fill(mask_attn.to(device) == 0, 0)
+            scores_nonzero_mean = (scores.sum(0)/(mask_attn.sum(0)).to(scores.device))
+            del mask_attn
+        else:
+            scores_nonzero_mean = scores.mean(0)
+        
+        if self.running_score is not None > 0:
+            new_scores = (1-self.alpha)*self.running_score + self.alpha*scores_nonzero_mean
+        else:
+            new_scores = scores_nonzero_mean
+        del scores, scores_nonzero_mean
+                
+        p_attn = (F.softmax(new_scores.repeat(len(x),1,1), dim=-1))
+        self.running_score = torch.nn.Parameter(new_scores, requires_grad=False)
+        return p_attn
+        
+ 
     
+# class SelfAttention(nn.Module):
+#     """
+#     Compute 'Scaled Dot Product Attention
+#     """
+#     def __init__(self, ncov, dropout=0.1, alpha = 0.9):
+#         super(SelfAttention, self).__init__()
+#         self.flatten = nn.Flatten()
+#         self.dropout = nn.Dropout(p=dropout)
+#         self.alpha = alpha
+#         self.running_score = torch.nn.Parameter(torch.zeros(ncov, ncov), requires_grad=False)
+#     def forward(self, x, mask=None, flatten=True, aggregate=True, recompute=True):
+
+#         # scores = torch.matmul(query, key.transpose(-2, -1)) \
+#         #          / math.sqrt(query.size(-1))
+        
+#         # f(query, key)
+#         # query: d \times m
+#         # (d x m ) x (m x d)
+#         # d \times d
+#         device = x.device
+#         if recompute:
+#             # recalculate attention score
+#             scores = torch.exp(torch.matmul(x, x.transpose(-2, -1))) \
+#                      / math.sqrt(x.size(-1))
+# #             print(scores.size())
+
+#             if aggregate:
+#                 # Assume that the covariates dependencies are transferrable
+
+#                 # mask missing points before softmax
+#                 if type(mask) != type(None):
+#                     mask_attn = attention_mask(mask.to(device), x.size(1))
+                    
+#                 p_attn = self.calculate_running_score(scores, mask_attn)
+# #                 print(scores.size())
+#             else:
+#                 if type(mask) != type(None):
+#                     scores = scores.masked_fill(mask_attn.to(device) == 0, 0)
+#                 p_attn = F.softmax(scores, dim=-1)
+                
+
+# #             del scores, mask_attn
+
+#     #         if dropout is not None:
+#             p_attn = self.dropout(p_attn)
+        
+#         else:
+#             # using stored scores
+#             scores = self.running_score.detach()
+#             p_attn = F.softmax(scores, dim=-1)
+#             p_attn = self.dropout(p_attn)
+            
+#         if mask is not None:
+#             output = torch.matmul(p_attn, x*mask.unsqueeze(-1).to(device))
+#             del mask
+#         else:
+#             output = torch.matmul(p_attn, x)
+        
+#         if flatten:
+# #             return self.flatten(output), p_attn
+# #             print(scores.size())
+#             return output.sum(1), p_attn.detach()
+#         else:
+#             return output, p_attn.detach()
+        
+#     def calculate_running_score(self, scores, mask_attn=None):
+# #         print(scores.size())
+#         if type(mask_attn) != type(None):
+#             scores = scores.masked_fill(mask_attn.to(device) == 0, 0)
+#             scores_nonzero_mean = (scores.sum(0)/(mask_attn.sum(0)).to(scores.device))
+#             del mask_attn
+#         else:
+#             scores_nonzero_mean = scores.mean(0)
+        
+#         if self.running_score.sum() > 0:
+#             new_scores = (1-self.alpha)*self.running_score + self.alpha*scores_nonzero_mean
+#         else:
+#             new_scores = scores_nonzero_mean
+#         del scores, scores_nonzero_mean
+                
+#         p_attn = (F.softmax(new_scores.repeat(len(x),1,1), dim=-1))
+#         self.running_score = torch.nn.Parameter(new_scores, requires_grad=False)
+#         return p_attn
+
+    
+    
+    
+# class SelfAttention(nn.Module):
+#     """
+#     Compute 'Scaled Dot Product Attention
+#     """
+#     def __init__(self, ncov, dropout=0.1, alpha = 0.9):
+#         super(SelfAttention, self).__init__()
+#         self.flatten = nn.Flatten()
+#         self.dropout = nn.Dropout(p=dropout)
+#         self.alpha = alpha
+#         self.running_score = torch.nn.Parameter(torch.zeros(ncov, ncov), requires_grad=False)
+#     def forward(self, x, mask=None, flatten=True, aggregate=True, recompute=True):
+
+#         # scores = torch.matmul(query, key.transpose(-2, -1)) \
+#         #          / math.sqrt(query.size(-1))
+        
+#         # f(query, key)
+#         # query: d \times m
+#         # (d x m ) x (m x d)
+#         # d \times d
+#         device = x.device
+#         if recompute:
+#             # recalculate attention score
+#             scores = torch.exp(torch.matmul(x, x.transpose(-2, -1))) \
+#                      / math.sqrt(x.size(-1))
+# #             print(scores.size())
+
+#             if aggregate:
+#                 # Assume that the covariates dependencies are transferrable
+
+#                 # mask missing points before softmax
+#                 if type(mask) != type(None):
+#                     mask_attn = attention_mask(mask.to(device), x.size(1))
+                    
+#                 p_attn = self.calculate_running_score(scores, mask_attn)
+# #                 print(scores.size())
+#             else:
+#                 if type(mask) != type(None):
+#                     scores = scores.masked_fill(mask_attn.to(device) == 0, 0)
+#                 p_attn = F.softmax(scores, dim=-1)
+                
+
+# #             del scores, mask_attn
+
+#     #         if dropout is not None:
+#             p_attn = self.dropout(p_attn)
+        
+#         else:
+#             # using stored scores
+#             scores = self.running_score.detach()
+#             p_attn = F.softmax(scores, dim=-1)
+#             p_attn = self.dropout(p_attn)
+            
+#         if mask is not None:
+#             output = torch.matmul(p_attn, x*mask.unsqueeze(-1).to(device))
+#             del mask
+#         else:
+#             output = torch.matmul(p_attn, x)
+        
+#         if flatten:
+# #             return self.flatten(output), p_attn
+# #             print(scores.size())
+#             return output.sum(1), p_attn.detach()
+#         else:
+#             return output, p_attn.detach()
+        
+#     def calculate_running_score(self, scores, mask_attn=None):
+# #         print(scores.size())
+#         if type(mask_attn) != type(None):
+#             scores = scores.masked_fill(mask_attn.to(device) == 0, 0)
+#             scores_nonzero_mean = (scores.sum(0)/(mask_attn.sum(0)).to(scores.device))
+#             del mask_attn
+#         else:
+#             scores_nonzero_mean = scores.mean(0)
+        
+#         if self.running_score.sum() > 0:
+#             new_scores = (1-self.alpha)*self.running_score + self.alpha*scores_nonzero_mean
+#         else:
+#             new_scores = scores_nonzero_mean
+#         del scores, scores_nonzero_mean
+                
+#         p_attn = (F.softmax(new_scores.repeat(len(x),1,1), dim=-1))
+#         self.running_score = torch.nn.Parameter(new_scores, requires_grad=False)
+#         return p_attn
+        
+ 
+        
+ 
+
+        
 class MultiHeadedAttention(nn.Module):
     """
     Take in models size and number of heads.

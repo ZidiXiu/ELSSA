@@ -111,6 +111,23 @@ def wt_avg(p_raw, tt):
     return t_wa_hat
 
 
-def attention_mask(mask_new, ncov, p=0.1):
-    mask_attn = (torch.ones(len(mask_new), ncov, ncov).to('cpu')-torch.diag(torch.ones(ncov)).unsqueeze(0).repeat(len(mask_new),1,1).to('cpu')+torch.vstack([torch.diag(mask_new[idx]).unsqueeze(0) for idx in range(len(mask_new))]))*(torch.rand(len(mask_new), ncov, ncov) > p).to('cpu')
+# def attention_mask(mask_new, ncov, p=0.1):
+#     mask_attn = (torch.ones(len(mask_new), ncov, ncov).to('cpu')-torch.diag(torch.ones(ncov)).unsqueeze(0).repeat(len(mask_new),1,1).to('cpu')+torch.vstack([torch.diag(mask_new[idx]).unsqueeze(0) for idx in range(len(mask_new))]))*(torch.rand(len(mask_new), ncov, ncov) > p).to('cpu')
+#     return mask_attn
+
+def attention_mask(mask_new, ncov):
+    mask_attn = torch.vstack([((mask_new[idx].unsqueeze(1).repeat(1, ncov))*(mask_new[idx].unsqueeze(0).repeat(ncov,1))).unsqueeze(0) for idx in range(len(mask_new))])
     return mask_attn
+#     if p > 0:
+#         return mask_attn*(torch.rand(len(mask_new), ncov, ncov) > p).to('cpu')
+#     else:
+        
+
+# def attention_mask(mask_new, ncov, p=0.1, aggregate = True):
+#     mask_attn = torch.vstack([((mask_new[idx].unsqueeze(1).repeat(1, ncov))*(mask_new[idx].unsqueeze(0).repeat(ncov,1))).unsqueeze(0) for idx in range(len(mask_new))])
+#     if aggregate = True:
+        
+#     if p > 0:
+#         return mask_attn*(torch.rand(len(mask_new), ncov, ncov) > p).to('cpu')
+#     else:
+#         return mask_attn
